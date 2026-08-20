@@ -358,42 +358,24 @@ export default function HomeScreen() {
         return;
       }
     } else {
-      // Confirma com o painel que o MAC continua autorizado. Se o revendedor
-      // bloqueou o MAC de vez, não tem mais o que fazer aqui — desloga.
-      logSessionEvent('home-load', 'checkMac: comecando (chamada de rede pro painel de revenda)');
-      const fresh = await checkMac(m);
-      logSessionEvent('home-load', `checkMac: terminou (${fresh.message})`);
-      const isRealResponse = fresh.message !== 'Falha de conexão.';
-      if (isRealResponse && !fresh.authorized) {
-        await clearSession();
-        await clearHomeCache();
-        router.replace('/');
-        return;
-      }
-      if (isRealResponse) {
-        await saveSession(fresh); // mantém sessão local sempre atualizada
-        const stillHasThisPlaylist = (fresh.playlists || []).some((p) => {
-          const parsed = parsePlaylistUrl(p.url);
-          return !!parsed && parsed.username === creds.username && parsed.server === creds.server;
-        });
-        if (!stillHasThisPlaylist) {
-          // A lista que o app estava usando não existe mais no painel. Só
-          // vale tentar trocar automaticamente pra outra se o painel ainda
-          // mandou alguma lista de verdade — se a resposta veio vazia (lista
-          // removida por completo, não só trocada), não tem pra onde trocar:
-          // desloga e volta pro login, em vez de ficar preso mostrando o
-          // conteúdo antigo em cache pra sempre.
-          const hasAnyOtherPlaylist = (fresh.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
-          if (!hasAnyOtherPlaylist) {
+      // A confirmação do painel não pode bloquear a primeira pintura da Home.
+      // O conteúdo salvo em cache e as listas atuais devem aparecer primeiro;
+      // a validação segue em segundo plano e só remove a sessão se houver uma
+      // resposta real de bloqueio. Isso evita que o D-pad fique sem responder
+      // enquanto a TV Box espera a rede do painel.
+      void checkMac(m)
+        .then(async (fresh) => {
+          logSessionEvent('home-load', `checkMac em segundo plano: ${fresh.message}`);
+          const isRealResponse = fresh.message !== 'Falha de conexão.';
+          if (isRealResponse && !fresh.authorized) {
             await clearSession();
             await clearHomeCache();
             router.replace('/');
             return;
           }
-          await setActivePlaylistIndex(0, false);
-          return load();
-        }
-      }
+          if (isRealResponse) await saveSession(fresh);
+        })
+        .catch(() => {});
     }
 
     // Fire all three independently — each one paints as soon as it's ready

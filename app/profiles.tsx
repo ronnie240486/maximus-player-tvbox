@@ -47,6 +47,8 @@ export default function ProfileSelectionScreen() {
     if (mySeq !== loadSeq.current) return;
     setMac(m);
     setProfiles(list);
+    setBg(cachedSession?.bg_url);
+    setLoading(false);
 
     // Sessão de teste: não existe no painel principal, então perguntar pra
     // ele sempre voltaria "não autorizado" e sobrescreveria a sessão de
@@ -54,14 +56,11 @@ export default function ProfileSelectionScreen() {
     // cadastrado lá) — mesmo bug que já foi corrigido em home.tsx e
     // index.tsx. Pra conta de teste, usa só o que já está salvo local.
     if (cachedSession?.status === 'Teste') {
-      setBg(cachedSession?.bg_url);
-      setLoading(false);
       return;
     }
 
-    // O fundo (bg_url) é uma URL assinada que expira em ~1h — por isso
-    // buscamos o status de novo aqui em vez de confiar só no que ficou
-    // salvo de uma sessão anterior, que pode estar com o link já vencido.
+    // Confirmação fresca do painel acontece depois que os perfis já foram
+    // pintados. Ela não bloqueia a navegação inicial da TV Box.
     const fresh = await checkMac(m);
 
     // O painel respondeu de verdade (não foi falha de rede) e disse que
@@ -74,13 +73,10 @@ export default function ProfileSelectionScreen() {
       return;
     }
 
-    const session = fresh.authorized ? fresh : cachedSession;
     if (fresh.authorized) {
       await saveSession(fresh);
+      setBg(fresh.bg_url);
     }
-
-    setBg(session?.bg_url);
-    setLoading(false);
   }, []);
 
   useFocusEffect(

@@ -10,17 +10,16 @@ import { getDeviceMac } from '@/src/lib/device';
 import { checkMac } from '@/src/api/client';
 import { loadSession } from '@/src/state/session';
 import { isWelcomeAudioEnabled } from '@/src/state/welcome-audio';
-import { prefetchHomeContent } from '@/src/state/prefetch';
 
 const welcomeAudioSource = require('@/assets/audio/welcome.wav');
 const swooshSource = require('@/assets/audio/swoosh.mp3');
-const FALLBACK_MS = 6000;
+const FALLBACK_MS = 1800;
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const [bg, setBg] = useState(undefined);
-  const [banner, setBanner] = useState(undefined);
-  const [logo, setLogo] = useState(undefined);
+  const [bg, setBg] = useState<string | undefined>(undefined);
+  const [banner, setBanner] = useState<string | undefined>(undefined);
+  const [logo, setLogo] = useState<string | undefined>(undefined);
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [bgFailed, setBgFailed] = useState(false);
@@ -41,13 +40,6 @@ export default function WelcomeScreen() {
     doneRef.current = true;
     router.replace('/profiles');
   };
-
-  useEffect(() => {
-    // Começa a buscar canais/filmes/séries agora, em segundo plano — assim,
-    // quando a pessoa chegar na Home (depois de escolher o perfil), os
-    // dados já estão prontos em vez de começar a busca do zero ali.
-    prefetchHomeContent();
-  }, []);
 
   useEffect(() => {
     (async () => {
@@ -111,7 +103,7 @@ export default function WelcomeScreen() {
   useEffect(() => {
     if (!ready) return;
     if (!audioEnabled) {
-      const t = setTimeout(goNext, 1800);
+      const t = setTimeout(goNext, 900);
       return () => clearTimeout(t);
     }
     // O efeito sonoro (uns 3s) começa primeiro; a voz "Bem-vindo ao

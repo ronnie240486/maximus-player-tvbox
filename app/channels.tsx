@@ -232,19 +232,16 @@ export default function ChannelsScreen() {
   // e força o componente inteiro a re-renderizar) — pesado o bastante
   // pra contribuir com o travamento ao navegar em listas grandes.
   const categoryCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const cat of catNames) {
-      if (cat === ALL) {
-        map[cat] = visibleStreams.length;
-      } else if (cat === FAVORITES) {
-        map[cat] = favoriteIds.size;
-      } else {
-        const catId = categoryIdByName.get(cat);
-        map[cat] = catId ? visibleStreams.filter((s) => s.category_id === catId).length : 0;
-      }
+    const map: Record<string, number> = { [ALL]: visibleStreams.length, [FAVORITES]: favoriteIds.size };
+    const byCategory = new Map<string, number>();
+    for (const stream of visibleStreams) {
+      if (stream.category_id) byCategory.set(stream.category_id, (byCategory.get(stream.category_id) || 0) + 1);
+    }
+    for (const cat of visibleCategories) {
+      map[cat.category_name] = byCategory.get(cat.category_id) || 0;
     }
     return map;
-  }, [catNames, visibleStreams, categoryIdByName, favoriteIds]);
+  }, [visibleStreams, visibleCategories, favoriteIds]);
 
   const nonFavFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -298,7 +295,10 @@ export default function ChannelsScreen() {
   // realmente carrega.
   const onFocusChannel = useCallback((item: XtreamLive) => {
     setFocusedChannel(item);
-    if (isLowEndDevice) return;
+    // Na TV, a prioridade é responder ao D-pad. O prefetch de manifesto
+    // durante o foco disputa rede/CPU com a renderização e não deve rodar
+    // enquanto o usuário navega pelos canais.
+    if (isLowEndDevice || isTV) return;
 
     // Pre-buffer leve: se o D-pad ficar parado 500ms num canal, busca o
     // manifesto (.m3u8) dele em background — sem player nenhum, só uma
@@ -318,7 +318,7 @@ export default function ChannelsScreen() {
       const url = liveStreamUrl(creds, item.stream_id, 'm3u8');
       fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1' } }).catch(() => {});
     }, 500);
-  }, [isLowEndDevice]);
+  }, [isLowEndDevice, isTV]);
 
   // 1º clique num canal: só carrega o preview (mini player), não abre
   // tela cheia ainda. 2º clique no MESMO canal (que já está em preview):
@@ -554,7 +554,6 @@ export default function ChannelsScreen() {
           data={filtered}
           keyExtractor={(c) => String(c.stream_id)}
           numColumns={numColumns}
-          columnWrapperStyle={{ gap: spacing.sm, paddingHorizontal: spacing.md }}
           contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 32, gap: spacing.sm }}
           {...gridFlashListPerf}
           onViewableItemsChanged={onGridViewableItemsChanged}
