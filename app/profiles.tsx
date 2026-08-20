@@ -128,17 +128,16 @@ export default function ProfileSelectionScreen() {
               renderItem={({ item }) => {
                 if ('addSlot' in item) {
                   return (
-                    <TVFocusable onPress={addProfile} style={styles.profileItem} focusStyle={styles.profileFocusTV} testID="profile-add-slot">
+                    <ProfileFocusTile onPress={addProfile} name="Adicionar" testID="profile-add-slot">
                       <View style={[styles.avatarCard, styles.addCard]}>
                         <Ionicons name="add" size={38} color={colors.textSecondary} />
                       </View>
-                      <Text style={styles.profileName}>Adicionar</Text>
-                    </TVFocusable>
+                    </ProfileFocusTile>
                   );
                 }
                 const p = item as Profile;
                 return (
-                  <TVFocusable onPress={() => openHome(p)} style={styles.profileItem} focusStyle={styles.profileFocusTV} testID={`profile-${p.id}`}>
+                  <ProfileFocusTile onPress={() => openHome(p)} name={p.name} testID={`profile-${p.id}`}>
                     <View style={styles.avatarCard}>
                       <Avatar id={p.avatar_id} size={92} radius={14} />
                       {p.isKids && (
@@ -147,8 +146,7 @@ export default function ProfileSelectionScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={styles.profileName} numberOfLines={1}>{p.name}</Text>
-                  </TVFocusable>
+                  </ProfileFocusTile>
                 );
               }}
             />
@@ -163,6 +161,36 @@ export default function ProfileSelectionScreen() {
         <Text style={styles.macTag} testID="profile-mac-tag">{mac}</Text>
       </SafeAreaView>
     </ImageBackground>
+  );
+}
+
+function ProfileFocusTile({
+  onPress,
+  name,
+  testID,
+  children,
+}: {
+  onPress: () => void;
+  name: string;
+  testID: string;
+  children: React.ReactNode;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <TVFocusable
+      onPress={onPress}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={styles.profileItem}
+      focusStyle={styles.profileFocusless}
+      testID={testID}
+    >
+      <View style={[styles.avatarFocusRing, focused && styles.avatarFocusRingActive]}>
+        {children}
+      </View>
+      <Text style={styles.profileName} numberOfLines={1}>{name}</Text>
+    </TVFocusable>
   );
 }
 
@@ -191,8 +219,12 @@ const styles = StyleSheet.create({
   },
   centerBlock: { flex: 1, justifyContent: 'center' },
   centerBlockTV: { paddingTop: 32 },
-  profileItem: { alignItems: 'center', width: 108, padding: 4, borderRadius: 20 },
-  profileFocusTV: { borderWidth: 2, borderColor: colors.accentCyan, borderRadius: 20 },
+  profileItem: { alignItems: 'center', width: 116, padding: 0 },
+  // O foco continua pertencendo ao item inteiro para o D-pad, mas não
+  // desenha borda no nome nem na área vazia do card.
+  profileFocusless: { borderWidth: 0, borderColor: 'transparent' },
+  avatarFocusRing: { padding: 3, borderWidth: 0, borderColor: 'transparent', borderRadius: 20 },
+  avatarFocusRingActive: { borderWidth: 2, borderColor: colors.accentCyan },
   avatarCard: {
     width: 100,
     height: 100,
