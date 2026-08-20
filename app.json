@@ -12,7 +12,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/8dec6c144-d88d-4c8f-80b3-b1df375ffd9e"
+      "url": "https://u.expo.dev/2d15512a-14a9-4bf4-a368-12c3ec693baf"
     },
     "ios": {
       "supportsTablet": true,
@@ -81,7 +81,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "8dec6c144-d88d-4c8f-80b3-b1df375ffd9e"
+        "projectId": "2d15512a-14a9-4bf4-a368-12c3ec693baf"
       }
     },
     "owner": "ronnie56s-team"
