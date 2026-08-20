@@ -692,18 +692,10 @@ export default function HomeScreen() {
     });
   };
 
-  const openKids = async () => {
-    const creds = getXtream();
-    if (!creds) {
-      router.push('/movies');
-      return;
-    }
-    const cats = await xtream.vodCategories(creds);
-    const match = cats?.find((c) => {
-      const n = c.category_name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return n.includes('anima') || n.includes('kids') || n.includes('infantil') || n.includes('desenho') || n.includes('crianca');
-    });
-    router.push({ pathname: '/movies', params: match ? { initialCategory: match.category_name } : {} });
+  const openKids = () => {
+    // Não espera a API de categorias para trocar de tela. Filmes carrega o
+    // catálogo normalmente e aplica o filtro assim que as categorias chegam.
+    router.push({ pathname: '/movies', params: { kids: '1' } });
   };
 
   const navIconSize = isTV ? 26 : 18;
@@ -788,7 +780,11 @@ export default function HomeScreen() {
                       // thread, não do controle em si).
                       logSessionEventFast('sidebar-focus', it.key);
                     }}
+                    hasTVPreferredFocus={it.key === 'home'}
                     onPress={() => {
+                      // A navegação não depende do estado de carregamento da
+                      // Home. A rota abre imediatamente e seus próprios dados
+                      // continuam sendo buscados em segundo plano.
                       setActiveNav(it.key);
                       it.onPress?.();
                     }}
@@ -884,9 +880,12 @@ export default function HomeScreen() {
               {allNavItems.map((it) => {
                 const active = activeNav === it.key;
                 return (
-                  <Pressable
+                  <TVFocusable
                     key={it.key}
+                    hasTVPreferredFocus={it.key === 'home'}
                     onPress={() => {
+                      // Mesmo sem os cards da Home, o destino do menu já está
+                      // disponível para o controle remoto.
                       setActiveNav(it.key);
                       it.onPress?.();
                     }}
@@ -897,7 +896,7 @@ export default function HomeScreen() {
                     <Text style={[styles.bottomNavLabel, active && styles.bottomNavLabelActive]}>
                       {it.label}
                     </Text>
-                  </Pressable>
+                  </TVFocusable>
                 );
               })}
             </ScrollView>
@@ -1165,6 +1164,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   bottomNav: {
     flexGrow: 0,
+    zIndex: 10,
+    elevation: 10,
     backgroundColor: colors.darkSurfaceAlt,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
@@ -1179,6 +1180,8 @@ const styles = StyleSheet.create({
     minWidth: 78,
     flexGrow: 0,
     flexShrink: 0,
+    zIndex: 10,
+    elevation: 10,
     backgroundColor: colors.darkSurfaceAlt,
     borderRightWidth: 1,
     borderRightColor: 'rgba(255,255,255,0.06)',

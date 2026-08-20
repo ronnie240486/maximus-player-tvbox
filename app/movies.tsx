@@ -58,7 +58,8 @@ export default function MoviesScreen() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<XtreamCategory[]>([]);
   const [movies, setMovies] = useState<XtreamMovie[]>([]);
-  const params = useLocalSearchParams<{ initialCategory?: string }>();
+  const params = useLocalSearchParams<{ initialCategory?: string; kids?: string }>();
+  const kidsRequested = params.kids === '1';
   const [selectedCat, setSelectedCat] = useState<string>(params.initialCategory || ALL);
   const [query, setQuery] = useState('');
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
@@ -122,6 +123,17 @@ export default function MoviesScreen() {
   useEffect(() => {
     isActiveProfileKids().then(setKidsMode);
   }, []);
+
+  // O menu Kids já abriu esta tela sem esperar a API. Quando as categorias
+  // chegarem, escolhe a primeira categoria compatível, sem bloquear a rota.
+  useEffect(() => {
+    if (!kidsRequested || !categories.length) return;
+    const match = categories.find((c) => {
+      const n = c.category_name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return n.includes('anima') || n.includes('kids') || n.includes('infantil') || n.includes('desenho') || n.includes('crianca');
+    });
+    if (match) setSelectedCat(match.category_name);
+  }, [kidsRequested, categories]);
 
   // Perfil infantil: conteúdo adulto não existe pra ele, nem categoria nem
   // item — ver o mesmo padrão em channels.tsx.
