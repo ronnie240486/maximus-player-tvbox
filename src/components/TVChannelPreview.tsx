@@ -57,6 +57,14 @@ export default function TVChannelPreview({
   // rebuffer, pipocos ou perda da posição atual.
 
   const tsFallbackTriedRef = React.useRef(false);
+  const tsFallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [epgReady, setEpgReady] = useState(false);
+
+  useEffect(() => {
+    setEpgReady(false);
+    const timer = setTimeout(() => setEpgReady(true), 1500);
+    return () => clearTimeout(timer);
+  }, [channel?.stream_id]);
 
   useEffect(() => {
     if (!channel || !creds) {
@@ -76,14 +84,44 @@ export default function TVChannelPreview({
   // deixar o preview preto, tenta trocar pra .ts uma vez.
   useEffect(() => {
     const sub = player.addListener('statusChange', (s) => {
-      if (s.status !== 'error' || !channel || !creds) return;
-      if (tsFallbackTriedRef.current) return;
-      tsFallbackTriedRef.current = true;
-      const tsUrl = liveStreamUrl(creds, channel.stream_id, 'ts');
-      setSource(tsUrl, true, 'live').catch(() => {});
+      // O player grande tem o seu próprio tratamento de erro. O preview não
+      // pode trocar a fonte enquanto a tela grande está montada, pois isso
+      // substituiria o mesmo ExoPlayer e destruiria o buffer atual.
+      if (s.status !== 'error') {
+        if (tsFallbackTimerRef.current) {
+          clearTimeout(tsFallbackTimerRef.current);
+          tsFallbackTimerRef.current = null;
+        }
+        return;
+      }
+      if (modeRef.current === 'full' || !channel || !creds) return;
+      if (tsFallbackTriedRef.current || tsFallbackTimerRef.current) return;
+
+      // Um erro nativo muito curto pode ser apenas uma oscilação transitória
+      // do servidor HLS. Só tenta o .ts se o estado continuar realmente em
+      // erro após a janela de debounce, nunca durante um simples buffering.
+      tsFallbackTimerRef.current = setTimeout(() => {
+        tsFallbackTimerRef.current = null;
+        if (
+          modeRef.current === 'full' ||
+          player.status !== 'error' ||
+          tsFallbackTriedRef.current ||
+          !channel ||
+          !creds
+        ) return;
+        tsFallbackTriedRef.current = true;
+        const tsUrl = liveStreamUrl(creds, channel.stream_id, 'ts');
+        setSource(tsUrl, true, 'live').catch(() => {});
+      }, 1200);
     });
-    return () => sub.remove();
-  }, [player, channel, creds]);
+    return () => {
+      sub.remove();
+      if (tsFallbackTimerRef.current) {
+        clearTimeout(tsFallbackTimerRef.current);
+        tsFallbackTimerRef.current = null;
+      }
+    };
+  }, [player, channel?.stream_id, creds, setSource]);
 
   if (!channel) {
     return (
@@ -108,9 +146,11 @@ export default function TVChannelPreview({
         </Text>
       </View>
 
-      <View style={styles.epgStripWrap}>
-        <EpgStrip creds={creds} channelId={channel.stream_id} channelName={channel.name} channelCover={channel.stream_icon} />
-      </View>
+      {epgReady && (
+        <View style={styles.epgStripWrap}>
+          <EpgStrip creds={creds} channelId={channel.stream_id} channelName={channel.name} channelCover={channel.stream_icon} />
+        </View>
+      )}
 
       <View style={styles.actionsRow}>
         {!!channel.tv_archive && (

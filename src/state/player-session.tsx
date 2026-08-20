@@ -32,7 +32,15 @@ export function PlayerSessionProvider({ children }: { children: React.ReactNode 
   const player = useVideoPlayer('', (p) => {
     p.loop = false;
     p.muted = false;
-    p.bufferOptions = { preferredForwardBufferDuration: 45 };
+    // Perfil estável para canais ao vivo em TV Box: mantém uma janela de
+    // 30s para absorver oscilações curtas, mas não deixa o player acumular
+    // buffer indefinidamente. A prioridade é tempo disponível, não o limite
+    // de bytes, porque streams LIVE podem variar muito de bitrate.
+    p.bufferOptions = {
+      preferredForwardBufferDuration: 30,
+      minBufferForPlayback: 2.5,
+      prioritizeTimeOverSizeThreshold: true,
+    };
   });
   const [mode, setMode] = useState<PlayerMode>('idle');
   const [source, setSourceState] = useState<string | null>(null);
@@ -88,7 +96,12 @@ export function PlayerSessionProvider({ children }: { children: React.ReactNode 
       setSourceState(uri);
       setKindState(nextKind);
       try {
-        await player.replaceAsync({ uri, headers: VIDEO_HEADERS });
+        const contentType = /\.m3u8(?:\?|$)/i.test(uri)
+          ? 'hls'
+          : /\.ts(?:\?|$)/i.test(uri)
+            ? 'progressive'
+            : 'auto';
+        await player.replaceAsync({ uri, headers: VIDEO_HEADERS, contentType });
         if (request !== requestRef.current) return;
         if (autoplay) player.play();
       } catch (error) {
@@ -135,7 +148,14 @@ export function PlayerSessionProvider({ children }: { children: React.ReactNode 
     <PlayerSessionContext.Provider value={value}>
       <View style={styles.hostRoot}>
         <View pointerEvents="none" style={surfaceStyle}>
-          <VideoView ref={videoViewRef} player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />
+          <VideoView
+            ref={videoViewRef}
+            player={player}
+            style={StyleSheet.absoluteFill}
+            contentFit="contain"
+            nativeControls={false}
+            surfaceType="textureView"
+          />
         </View>
         <View style={styles.content}>{children}</View>
       </View>

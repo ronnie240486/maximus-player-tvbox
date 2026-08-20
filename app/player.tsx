@@ -107,6 +107,7 @@ export default function PlayerScreen() {
   // stream muda (troca de canal/filme).
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isLive = String(params.id || '').startsWith('live-');
 
@@ -155,6 +156,14 @@ export default function PlayerScreen() {
   });
 
   const [epg, setEpg] = useState<XtreamEpgListing[]>([]);
+  const [epgReady, setEpgReady] = useState(false);
+
+  useEffect(() => {
+    setEpgReady(false);
+    if (!isLive) return;
+    const timer = setTimeout(() => setEpgReady(true), 1500);
+    return () => clearTimeout(timer);
+  }, [isLive, current.id]);
 
   useEffect(() => {
     if (!isLive) return;
@@ -311,6 +320,43 @@ export default function PlayerScreen() {
     };
 
     const statusSub = player.addListener('statusChange', (s) => {
+      if (s.status === 'error') {
+        // Não troca a fonte no primeiro erro nativo. Alguns servidores HLS
+        // sinalizam erro por um instante enquanto avançam para o próximo
+        // segmento; recarregar nesse ponto destrói o buffer e produz o
+        // efeito de vídeo "dançando". Só trata como erro real se o estado
+        // continuar assim por 1,2s.
+        setBuffering(true);
+        if (errorDebounceTimer.current) clearTimeout(errorDebounceTimer.current);
+        errorDebounceTimer.current = setTimeout(() => {
+          errorDebounceTimer.current = null;
+          if (player.status !== 'error') return;
+
+          // Alguns servidores Xtream (comum em contas de teste) não servem
+          // o formato HLS (.m3u8) pros canais ao vivo, só o .ts direto —
+          // antes de mostrar erro pro usuário, tenta trocar pra .ts uma
+          // vez. Se isso também falhar (ou já não for um canal .m3u8),
+          // cai pra reconexão automática genérica abaixo.
+          const canFallback =
+            isLive &&
+            !!current.stream &&
+            current.stream.includes('.m3u8') &&
+            tsFallbackTriedFor.current !== current.stream;
+          if (canFallback) {
+            tsFallbackTriedFor.current = current.stream;
+            const tsUrl = current.stream.replace(/\.m3u8(\?|$)/, '.ts$1');
+            setSource(tsUrl, true, 'live').catch(() => attemptReconnect());
+            return;
+          }
+          attemptReconnect();
+        }, 1200);
+        return;
+      }
+
+      if (errorDebounceTimer.current) {
+        clearTimeout(errorDebounceTimer.current);
+        errorDebounceTimer.current = null;
+      }
       setBuffering(s.status === 'loading');
       // Assim que o player carregou o suficiente pra tocar, se tiver uma
       // posição salva de uma sessão anterior (e ainda não tiver retomado
@@ -322,11 +368,6 @@ export default function PlayerScreen() {
         resumeAppliedRef.current = true;
         getResumePosition(params.id).then((pos) => {
           if (pos === null) return;
-          // Pergunta explicitamente, em vez de pular a posição em
-          // silêncio — assim a pessoa vê claramente que o app "lembrou"
-          // de onde parou (e se por acaso não tiver salvo certo, ela
-          // sabe na hora, em vez de só reparar que voltou do início sem
-          // entender por quê).
           const mm = Math.floor(pos / 60);
           const ss = String(Math.floor(pos % 60)).padStart(2, '0');
           try {
@@ -358,26 +399,6 @@ export default function PlayerScreen() {
           );
         });
       }
-      if (s.status === 'error') {
-        // Alguns servidores Xtream (comum em contas de teste) não servem
-        // o formato HLS (.m3u8) pros canais ao vivo, só o .ts direto —
-        // antes de mostrar erro pro usuário, tenta trocar pra .ts uma
-        // vez. Se isso também falhar (ou já não for um canal .m3u8),
-        // cai pra reconexão automática genérica abaixo.
-        const canFallback =
-          isLive &&
-          !!current.stream &&
-          current.stream.includes('.m3u8') &&
-          tsFallbackTriedFor.current !== current.stream;
-        if (canFallback) {
-          tsFallbackTriedFor.current = current.stream;
-          const tsUrl = current.stream.replace(/\.m3u8(\?|$)/, '.ts$1');
-          setSource(tsUrl, true, 'live').catch(() => attemptReconnect());
-          return;
-        }
-        attemptReconnect();
-        return;
-      }
       // Qualquer status que não seja erro (voltou a carregar/tocar
       // normal) significa que, se estávamos tentando reconectar, deu
       // certo — zera o contador pra próxima queda ter as 3 tentativas
@@ -392,6 +413,7 @@ export default function PlayerScreen() {
       statusSub.remove();
       playingSub.remove();
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      if (errorDebounceTimer.current) clearTimeout(errorDebounceTimer.current);
     };
   }, [player, isLive, current.stream]);
 
@@ -717,7 +739,7 @@ export default function PlayerScreen() {
               </View>
             </View>
 
-            {isLive && (
+            {isLive && epgReady && (
               <View style={styles.epgStripWrap}>
                 <EpgStrip
                   creds={getXtream()}
