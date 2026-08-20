@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Maximus Player",
-    "slug": "interactive-player-v2",
+    "slug": "tvbox",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
