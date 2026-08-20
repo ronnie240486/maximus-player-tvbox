@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import * as Device from 'expo-device';
 
 type SharedPlayer = ReturnType<typeof useVideoPlayer>;
 type PlayerMode = 'idle' | 'mini' | 'full';
@@ -27,6 +28,12 @@ const PlayerSessionContext = createContext<PlayerSessionValue | null>(null);
 const VIDEO_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Linux; Android 12) ExoPlayerLib/2.19.1',
 };
+
+// A superfície de textura é útil na TV quando o vídeo muda de tamanho entre
+// mini e tela cheia. No celular, alguns drivers reproduzem o áudio mas deixam
+// a TextureView preta; por isso o telefone usa a SurfaceView padrão.
+const VIDEO_SURFACE_TYPE: 'surfaceView' | 'textureView' =
+  Device.deviceType === Device.DeviceType.TV ? 'textureView' : 'surfaceView';
 
 export function PlayerSessionProvider({ children }: { children: React.ReactNode }) {
   const player = useVideoPlayer('', (p) => {
@@ -154,7 +161,7 @@ export function PlayerSessionProvider({ children }: { children: React.ReactNode 
             style={StyleSheet.absoluteFill}
             contentFit="contain"
             nativeControls={false}
-            surfaceType="textureView"
+            surfaceType={VIDEO_SURFACE_TYPE}
           />
         </View>
         <View style={styles.content}>{children}</View>
