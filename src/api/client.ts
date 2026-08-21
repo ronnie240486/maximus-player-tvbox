@@ -156,13 +156,17 @@ export async function sendHeartbeat(mac: string, content: string): Promise<void>
 
 export async function checkMac(mac: string): Promise<MacStatus> {
   const upstream = `${PANEL_BASE}/check_mac.php?mac=${encodeURIComponent(mac)}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetch(proxied(upstream), { headers: commonHeaders });
+    const res = await fetch(proxied(upstream), { headers: commonHeaders, signal: controller.signal });
     const json = await safeJson<any>(res);
     if (!json) return { authorized: false, registered: false, mac, message: 'Resposta inválida.' };
     return normalize(json, mac);
   } catch {
     return { authorized: false, registered: false, mac, message: 'Falha de conexão.' };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

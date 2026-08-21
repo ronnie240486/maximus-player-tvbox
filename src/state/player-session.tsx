@@ -92,6 +92,12 @@ export function PlayerSessionProvider({ children }: { children: React.ReactNode 
         setSourceState(uri);
         if (autoplay && request === requestRef.current) {
           try {
+            // Não recarrega uma transmissão saudável ao trocar mini/cheia.
+            // Porém, depois de um erro nativo ou de uma saída que deixou o
+            // player ocioso, `play()` sozinho não recupera a superfície.
+            if (player.status === 'error' || player.status === 'idle') {
+              await player.replaceAsync({ uri, headers: VIDEO_HEADERS, contentType: /\.m3u8(?:\?|$)/i.test(uri) ? 'hls' : /\.ts(?:\?|$)/i.test(uri) ? 'progressive' : 'auto' });
+            }
             player.play();
           } catch {}
         }

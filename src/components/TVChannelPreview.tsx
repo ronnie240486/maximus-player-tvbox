@@ -35,8 +35,9 @@ export default function TVChannelPreview({
   onSearch,
 }: Props) {
 
-  const { player, setSource, mode, reportMiniRect } = usePlayerSession();
+  const { player, setSource, stop, mode, source: sessionSource, kind: sessionKind, reportMiniRect } = usePlayerSession();
   const modeRef = React.useRef(mode);
+  const previousModeRef = React.useRef(mode);
   const videoBoxRef = React.useRef<View>(null);
   modeRef.current = mode;
 
@@ -49,7 +50,29 @@ export default function TVChannelPreview({
   React.useEffect(() => {
     const frame = requestAnimationFrame(measureMiniSurface);
     return () => cancelAnimationFrame(frame);
-  }, [measureMiniSurface, channel?.stream_id]);
+  }, [measureMiniSurface, channel?.stream_id, mode]);
+
+  React.useEffect(() => {
+    const previousMode = previousModeRef.current;
+    previousModeRef.current = mode;
+    if (previousMode !== 'full' || mode !== 'mini') return;
+    if (!channel || !creds || sessionKind !== 'live' || !sessionSource) return;
+    if (!sessionSource.includes(`/${channel.stream_id}.`)) return;
+
+    // A sessão continua sendo a mesma; esta chamada não faz replace quando
+    // o player está saudável. Ela apenas dá play novamente ou reabre a fonte
+    // se o Android deixou o player ocioso ao desmontar a rota grande.
+    setSource(sessionSource, true, 'live').catch(() => {});
+  }, [mode, channel?.stream_id, creds, sessionKind, sessionSource, setSource]);
+
+  // Ao sair de Canais de verdade, não deixa o ExoPlayer tocando escondido.
+  // O cleanup não roda ao abrir a rota grande, porque o preview continua
+  // montado enquanto a tela cheia está por cima.
+  React.useEffect(() => {
+    return () => {
+      if (modeRef.current !== 'full') stop();
+    };
+  }, [stop]);
 
   // A sessão global continua viva durante a navegação, mas o preview não
   // mantém uma segunda superfície montada quando o player grande aparece.

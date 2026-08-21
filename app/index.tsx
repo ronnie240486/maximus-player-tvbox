@@ -139,27 +139,12 @@ export default function MacLoginScreen() {
           await clearSession();
           await clearHomeCache();
         } else {
-          logSessionEvent('index-load', 'checkMac (2a chamada, confirmando sessao salva): comecando');
-          const fresh = await checkMac(m);
-          logSessionEvent('index-load', 'checkMac (2a chamada): terminou');
-          if (!mountedRef.current) return;
-          // Não basta "authorized: true" — o painel às vezes marca o MAC
-          // como autorizado mesmo sem nenhuma lista cadastrada de verdade
-          // (bug do lado deles). Confirma que existe pelo menos uma
-          // playlist que dá pra usar antes de liberar a entrada.
-          const hasUsablePlaylist = (fresh.playlists || []).some((p) => !!parsePlaylistUrl(p.url));
-          if (fresh.authorized && hasUsablePlaylist) {
-            await saveSession(fresh);
-            logSessionEvent('index-load', 'autorizado, indo pra /welcome');
-            router.replace('/welcome');
-            return;
-          }
-          // Não está mais autorizado (ou não tem lista nenhuma que
-          // funcione) — limpa a sessão velha e segue pro fluxo normal de
-          // verificação abaixo.
-          await clearSession();
-          await clearHomeCache();
-          setStatus(fresh);
+          // A sessão local já foi validada anteriormente. Não bloqueia a
+          // entrada esperando uma segunda chamada de rede: o Welcome e os
+          // Perfis atualizam/confirmam o painel em segundo plano.
+          logSessionEvent('index-load', 'sessao salva, indo imediatamente pra /welcome');
+          router.replace('/welcome');
+          return;
         }
       }
 

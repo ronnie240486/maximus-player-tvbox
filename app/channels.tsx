@@ -355,7 +355,14 @@ export default function ChannelsScreen() {
           params: {
             id: `live-${s.stream_id}`,
             name: s.name,
-            stream: sessionKind === 'live' && sessionSource ? sessionSource : liveStreamUrl(creds, s.stream_id, 'm3u8'),
+            // Reaproveita a fonte apenas se ela pertence ao canal escolhido.
+            // Sem essa validação, sair de um canal e abrir outro podia levar
+            // a URL antiga para a tela cheia, deixando o player preso ou
+            // exibindo o canal errado.
+            stream:
+              sessionKind === 'live' && sessionSource && sessionSource.includes(`/${s.stream_id}.`)
+                ? sessionSource
+                : liveStreamUrl(creds, s.stream_id, 'm3u8'),
             logo: s.stream_icon || '',
             adult: isAdultCategoryName(categoryName) ? '1' : '',
           },

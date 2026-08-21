@@ -10,6 +10,7 @@ import { getDeviceMac } from '@/src/lib/device';
 import { checkMac } from '@/src/api/client';
 import { loadSession } from '@/src/state/session';
 import { isWelcomeAudioEnabled } from '@/src/state/welcome-audio';
+import { useIsTV } from '@/src/hooks/useIsTV';
 
 const welcomeAudioSource = require('@/assets/audio/welcome.wav');
 const swooshSource = require('@/assets/audio/swoosh.mp3');
@@ -17,6 +18,7 @@ const FALLBACK_MS = 1800;
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const isTV = useIsTV();
   const [bg, setBg] = useState<string | undefined>(undefined);
   const [banner, setBanner] = useState<string | undefined>(undefined);
   const [logo, setLogo] = useState<string | undefined>(undefined);
@@ -61,17 +63,14 @@ export default function WelcomeScreen() {
       setBanner(cached?.banner_url);
       setLogo(cached?.logo_url);
 
-      // Pré-carrega só a imagem que JÁ TEMOS (local/cache), com um teto
-      // bem curto — é só pra imagem e áudio começarem juntos (ver fix
-      // anterior), não faz sentido esperar mais que isso.
+      // Pré-carrega a imagem em segundo plano, mas nunca espera a rede para
+      // liberar a tela. O logo/fundo aparece quando terminar e os perfis já
+      // podem abrir imediatamente.
       const cachedToPrefetch = [cached?.banner_url, cached?.logo_url, cached?.bg_url].filter(
         (u): u is string => !!u
       );
       if (cachedToPrefetch.length) {
-        await Promise.race([
-          Image.prefetch(cachedToPrefetch).catch(() => {}),
-          new Promise((resolve) => setTimeout(resolve, 800)),
-        ]);
+        void Image.prefetch(cachedToPrefetch).catch(() => {});
       }
 
       setReady(true);
@@ -111,7 +110,10 @@ export default function WelcomeScreen() {
     // assim o efeito não fica em cima da voz nem cortado por ela.
     swooshPlayer.play();
     const voiceDelay = setTimeout(() => player.play(), 350);
-    const fallback = setTimeout(goNext, FALLBACK_MS);
+    // Na TV Box a prioridade é chegar aos perfis rapidamente. O áudio
+    // continua disponível, mas não pode segurar a entrada por vários
+    // segundos enquanto o efeito termina.
+    const fallback = setTimeout(goNext, isTV ? 900 : FALLBACK_MS);
     return () => {
       clearTimeout(voiceDelay);
       clearTimeout(fallback);
