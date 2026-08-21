@@ -178,6 +178,20 @@ export function isAdultCategoryName(categoryName?: string | null): boolean {
   return NORMALIZED_ADULT_KEYWORDS.some((kw) => n.includes(kw));
 }
 
+// A Home não carrega as categorias completas antes de montar as vitrines.
+// Por isso também existe uma barreira por título, para impedir que uma lista
+// adulta mal categorizada apareça em Filmes em Alta ou no destaque.
+const ADULT_TITLE_RE = /(?:^|[^a-z0-9])(?:xxx|adulto|adult|porn|porno|pornografia|sexo|sex|erotic|erotico|erotica|18\+|\+18|nsfw|nude|nudity|hardcore|fetish|hentai|anal|boquete|prostitu|onlyfans|playboy|sexy)(?:$|[^a-z0-9])/i;
+
+export function isAdultTitle(title?: string | null): boolean {
+  if (!title) return false;
+  return ADULT_TITLE_RE.test(normalize(title));
+}
+
+export function filterOutAdultTitles<T extends { name?: string | null }>(items: T[]): T[] {
+  return items.filter((item) => !isAdultTitle(item.name));
+}
+
 export function isKidsCategoryName(categoryName?: string | null): boolean {
   if (!categoryName) return false;
   const n = normalize(categoryName);

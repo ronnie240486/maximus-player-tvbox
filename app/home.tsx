@@ -38,7 +38,7 @@ import { popDueReminders } from '@/src/state/game-reminders';
 import { logSessionEvent, logSessionEventFast } from '@/src/state/debug-log';
 import { popDueProgramReminders, ProgramReminder } from '@/src/state/program-reminders';
 import ProgramReminderPopup from '@/src/components/ProgramReminderPopup';
-import { isAdultCategoryName, filterToKidsItems } from '@/src/lib/adult-content';
+import { isAdultCategoryName, filterToKidsItems, filterOutAdultTitles } from '@/src/lib/adult-content';
 import { isActiveProfileKids } from '@/src/state/profiles';
 import { dedupeByName } from '@/src/lib/dedupe';
 import { useParentalGate } from '@/src/lib/use-parental-gate';
@@ -330,11 +330,20 @@ export default function HomeScreen() {
     // then keep loading in the background and swap in fresh data per
     // section as it arrives. No spinner if we already have something to show.
     if (cache?.sections) {
-      setSlots((prev) => ({ ...prev, ...(cache.sections as { live?: Section; movies?: Section; series?: Section }) }));
+      const cachedSections = cache.sections as { live?: Section; movies?: Section; series?: Section };
+      const safeCachedSections = {
+        ...cachedSections,
+        movies: cachedSections.movies
+          ? { ...cachedSections.movies, items: filterOutAdultTitles(cachedSections.movies.items) }
+          : undefined,
+      };
+      setSlots((prev) => ({ ...prev, ...safeCachedSections }));
       setLoading(false);
     }
     if (featuredCache && featuredCache.length > 0) {
-      setFeatured(featuredCache as FeaturedEntry[]);
+      // O cache pode ter sido gravado antes da regra de segurança da Home.
+      // Filtra antes de pintar para nunca exibir adulto em Sugestões/destaque.
+      setFeatured(filterOutAdultTitles(featuredCache as FeaturedEntry[]));
     }
 
     const creds = getXtream();
@@ -448,11 +457,12 @@ export default function HomeScreen() {
       const gotSomething = !!(filteredMovies && filteredMovies.length);
       if (gotSomething) {
         const deduped = dedupeByName(filteredMovies!);
+        const homeMovies = filterOutAdultTitles(deduped);
         setSlots((prev) => ({
           ...prev,
           movies: {
             title: 'FILMES EM ALTA',
-            items: deduped.slice(0, 20).map((m: XtreamMovie) => ({
+            items: homeMovies.slice(0, 20).map((m: XtreamMovie) => ({
               id: `movie-${m.stream_id}`,
               name: m.name,
               logo: m.stream_icon || undefined,
@@ -460,6 +470,8 @@ export default function HomeScreen() {
             })),
           },
         }));
+        // O catálogo completo continua disponível na tela Filmes; só a
+        // vitrine da Home recebe a exclusão de conteúdo adulto.
         loadListCache<unknown, XtreamMovie>('movies').then((existing) => {
           saveListCache('movies', existing?.categories || [], filteredMovies!);
         });
@@ -523,11 +535,13 @@ export default function HomeScreen() {
       saveFeaturedCache(finalFeatured);
     };
     moviesP.then((movies) => {
-      featuredMovies = movies || [];
+      // Sugestões/destaque nunca recebem filmes adultos, mesmo quando o
+      // painel não marcou corretamente a categoria.
+      featuredMovies = filterOutAdultTitles(movies || []);
       buildFeatured();
     });
     seriesP.then((series) => {
-      featuredSeries = series || [];
+      featuredSeries = filterOutAdultTitles(series || []);
       buildFeatured();
     });
 
