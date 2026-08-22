@@ -14,6 +14,7 @@ import {
   BackHandler,
   ToastAndroid,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -191,6 +192,12 @@ export default function HomeScreen() {
     React.useCallback(() => {
       let cancelled = false;
       (async () => {
+        // Não disputa a primeira interação do controle remoto. A validação
+        // e os lembretes entram depois que o sidebar já recebeu o foco.
+        await new Promise<void>((resolve) => {
+          InteractionManager.runAfterInteractions(() => resolve());
+        });
+        if (cancelled) return;
         // Roda em TODA vez que a tela ganha foco (não só quando abre o
         // app) — por isso a checagem de bloqueio/lista removida precisa
         // estar aqui também, não só no load() inicial. Sem isso, "Continue
@@ -589,7 +596,14 @@ export default function HomeScreen() {
   }, [isLowEndDevice]);
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (!cancelled) load();
+    });
+    return () => {
+      cancelled = true;
+      task.cancel();
+    };
   }, [load]);
 
   const openFeaturedDetails = (item: FeaturedEntry) => {
@@ -729,7 +743,6 @@ export default function HomeScreen() {
     { key: 'placar', label: 'Placar', testID: 'nav-placar', icon: (active: boolean) => <MaterialCommunityIcons name="scoreboard-outline" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/placar') },
     { key: 'kids', label: 'Kids', testID: 'nav-kids', icon: (active: boolean) => <MaterialCommunityIcons name="drawing" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: openKids },
     { key: 'radios', label: 'Rádios', testID: 'nav-radios', icon: (active: boolean) => <MaterialCommunityIcons name="radio" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/radios') },
-    { key: 'world-cameras', label: 'Câmeras', testID: 'nav-world-cameras', icon: (active: boolean) => <Ionicons name="earth" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/world-cameras') },
     { key: 'search', label: 'Busca', testID: 'nav-search', icon: (active: boolean) => <Ionicons name="search" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/search') },
     { key: 'diagnostic', label: 'Diagnóstico', testID: 'nav-diagnostic', icon: (active: boolean) => <Ionicons name="pulse" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/diagnostic') },
     { key: 'settings', label: 'Ajustes', testID: 'nav-settings', icon: (active: boolean) => <Ionicons name="settings" size={navIconSize} color={active ? colors.accentCyan : colors.textSecondary} />, onPress: () => router.push('/settings') },

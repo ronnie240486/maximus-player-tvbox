@@ -37,6 +37,8 @@ export default function EditProfileScreen() {
   const [name, setName] = useState('');
   const [avatarId, setAvatarId] = useState<string>('avatar_1');
   const [isKids, setIsKids] = useState(false);
+  const [focusedMiniId, setFocusedMiniId] = useState<string | null>(null);
+  const [focusedAvatarId, setFocusedAvatarId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const list = await loadProfiles();
@@ -133,21 +135,22 @@ export default function EditProfileScreen() {
                 <TVFocusable
                   key={p.id}
                   onPress={() => pickProfile(p)}
+                  onFocus={() => setFocusedMiniId(p.id)}
+                  onBlur={() => setFocusedMiniId((current) => (current === p.id ? null : current))}
+                  focusStyle={styles.profileFocusless}
                   style={styles.profileMini}
                   testID={`manage-profile-${p.id}`}
                 >
-                  <View
-                    style={[
-                      styles.miniWrap,
-                      selectedId === p.id && { borderColor: colors.accentCyan },
-                    ]}
-                  >
+                  <View style={styles.miniWrap}>
                     <Avatar id={p.avatar_id} size={54} radius={11} />
+                    {(selectedId === p.id || focusedMiniId === p.id) && (
+                      <View pointerEvents="none" style={styles.miniFocusOverlay} />
+                    )}
                   </View>
                   <Text style={styles.miniName} numberOfLines={1}>{p.name}</Text>
                 </TVFocusable>
               ))}
-              <TVFocusable onPress={startNew} style={styles.profileMini} testID="manage-add-new">
+              <TVFocusable onPress={startNew} focusStyle={styles.profileFocusless} style={styles.profileMini} testID="manage-add-new">
                 <View style={styles.addPlus}>
                   <Ionicons name="add" size={28} color={colors.textSecondary} />
                 </View>
@@ -181,10 +184,18 @@ export default function EditProfileScreen() {
             <TVFocusable
               key={a.id}
               onPress={() => setAvatarId(a.id)}
-              style={[styles.avatarChoice, avatarId === a.id && styles.avatarChoiceActive]}
+              onFocus={() => setFocusedAvatarId(a.id)}
+              onBlur={() => setFocusedAvatarId((current) => (current === a.id ? null : current))}
+              focusStyle={styles.profileFocusless}
+              style={styles.avatarChoice}
               testID={`avatar-choice-${a.id}`}
             >
-              <Avatar id={a.id} size={54} radius={12} />
+              <View style={styles.avatarChoiceInner}>
+                <Avatar id={a.id} size={54} radius={12} />
+                {(avatarId === a.id || focusedAvatarId === a.id) && (
+                  <View pointerEvents="none" style={styles.avatarChoiceOverlay} />
+                )}
+              </View>
             </TVFocusable>
           ))}
         </View>
@@ -254,11 +265,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   profileMini: { alignItems: 'center', width: 72 },
+  profileFocusless: { borderWidth: 0, borderColor: 'transparent' },
   miniWrap: {
-    padding: 3,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    width: 54,
+    height: 54,
+    borderRadius: 11,
+    overflow: 'hidden',
+    position: 'relative',
   },
   addPlus: {
     width: 60,
@@ -269,6 +282,12 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  miniFocusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.accentCyan,
   },
   miniName: { color: colors.white, fontSize: 11, marginTop: 4 },
   previewWrap: { alignItems: 'center', marginBottom: spacing.md },
@@ -288,12 +307,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   avatarChoice: {
-    padding: 4,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    padding: 0,
   },
-  avatarChoiceActive: { borderColor: colors.accentCyan },
+  avatarChoiceInner: {
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  avatarChoiceOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.accentCyan,
+  },
   kidsToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -186,8 +186,9 @@ function ProfileFocusTile({
       focusStyle={styles.profileFocusless}
       testID={testID}
     >
-      <View style={[styles.avatarFocusRing, focused && styles.avatarFocusRingActive]}>
+      <View style={styles.avatarFocusRing}>
         {children}
+        {focused && <View pointerEvents="none" style={styles.avatarFocusOverlay} />}
       </View>
       <Text style={styles.profileName} numberOfLines={1}>{name}</Text>
     </TVFocusable>
@@ -223,8 +224,19 @@ const styles = StyleSheet.create({
   // O foco continua pertencendo ao item inteiro para o D-pad, mas não
   // desenha borda no nome nem na área vazia do card.
   profileFocusless: { borderWidth: 0, borderColor: 'transparent' },
-  avatarFocusRing: { padding: 3, borderWidth: 0, borderColor: 'transparent', borderRadius: 20 },
-  avatarFocusRingActive: { borderWidth: 2, borderColor: colors.accentCyan },
+  avatarFocusRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  avatarFocusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.accentCyan,
+  },
   avatarCard: {
     width: 100,
     height: 100,

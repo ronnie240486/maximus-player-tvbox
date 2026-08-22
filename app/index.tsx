@@ -41,6 +41,7 @@ export default function MacLoginScreen() {
   const [extras, setExtras] = useState<AppExtras>({});
   const [status, setStatus] = useState<MacStatus | null>(null);
   const [bgFailed, setBgFailed] = useState(false);
+  const [cachedBg, setCachedBg] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
   const [pollCount, setPollCount] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -106,6 +107,14 @@ export default function MacLoginScreen() {
     mountedRef.current = true;
     (async () => {
       logSessionEvent('index-load', 'inicio (tela de ativacao)');
+      // Carrega o fundo salvo em paralelo ao MAC. Assim a primeira tela já
+      // pode pintar a imagem do painel enquanto a checagem continua.
+      const cachedPromise = loadSession();
+      cachedPromise
+        .then((cached) => {
+          if (mountedRef.current) setCachedBg(cached?.bg_url);
+        })
+        .catch(() => {});
       const m = await getDeviceMac();
       if (!mountedRef.current) return;
       setMac(m);
@@ -122,7 +131,7 @@ export default function MacLoginScreen() {
       // Mesmo com sessão salva, sempre confirma de novo com o painel antes
       // de liberar — se o revendedor bloqueou a lista nesse meio tempo, o
       // app não pode continuar usando dados antigos salvos no celular.
-      const cached = await loadSession();
+      const cached = await cachedPromise;
       logSessionEvent('index-load', `sessao local carregada (tinha sessao: ${!!cached?.authorized}, status: ${cached?.status || '-'})`);
       if (cached?.authorized) {
         if (cached.status === 'Teste') {
@@ -371,7 +380,7 @@ export default function MacLoginScreen() {
     }
   };
 
-  const bg = status?.bg_url;
+  const bg = status?.bg_url || cachedBg;
   const logo = status?.logo_url;
   const banner = status?.banner_url;
   const appName = status?.app_name;
@@ -411,9 +420,15 @@ export default function MacLoginScreen() {
     // já existe uma sessão válida — sem isso, a tela de "Como entrar"
     // aparecia rapidinho toda vez, mesmo pra quem já estava logado.
     return (
-      <View style={[styles.bg, styles.center]} testID="mac-login-checking-session">
+      <ImageBackground
+        source={bg && !bgFailed ? { uri: bg } : require('@/assets/images/default-bg.png')}
+        onError={() => setBgFailed(true)}
+        style={[styles.bg, styles.center]}
+        imageStyle={{ opacity: bg && !bgFailed ? 0.25 : 0.75 }}
+        testID="mac-login-checking-session"
+      >
         <ActivityIndicator color={colors.accentCyan} size="large" />
-      </View>
+      </ImageBackground>
     );
   }
 
