@@ -76,6 +76,9 @@
         }
       ]
     ],
+    "autolinking": {
+      "exclude": ["react-native-reanimated", "react-native-worklets"]
+    },
     "experiments": {
       "typedRoutes": true
     },
